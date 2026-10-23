@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "作業開始",
+      "detail": "Issue の番号を入れると、自分の作業ブランチを作る(既にあれば戻る)",
+      "type": "process",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["scripts/start.sh", "${input:issue}", "${input:name}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": true, "panel": "shared", "clear": true, "showReuseMessage": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "ブランチ切り替え",
+      "detail": "GitHub にある作業ブランチの一覧から選んで切り替える(レビュー用)",
+      "type": "process",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["scripts/switch.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": true, "panel": "shared", "clear": true, "showReuseMessage": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "提出",
+      "detail": "PR.md を書いてから実行する。記録して送り、提出ページをブラウザで開く",
+      "type": "process",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["scripts/submit.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": true, "panel": "shared", "clear": true, "showReuseMessage": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "やり直し(main に戻る)",
+      "detail": "切り替えられなくなったときに使う。記録していない変更を local/backup に控えてから main の最新に戻る",
+      "type": "process",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["scripts/reset.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": true, "panel": "shared", "clear": true, "showReuseMessage": false },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    { "id": "issue", "type": "promptString", "description": "Issue の番号(例: 12)" },
+    { "id": "name", "type": "promptString", "description": "短い英語の名前(省略可。例: login)", "default": "" }
+  ]
+}

@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ(tasks.json だけはチームで共有する)
+.vscode/*
+!.vscode/tasks.json
+
+# 秘密情報
+.env
+.env.*
+*.pem
+*.key
+
+# ローカル専用(提出メモの控えなど)。中身は Git に入れない。フォルダ自体は .gitkeep で残す
+local/*
+!local/.gitkeep
+
+# 技術構成が決まったら、言語やフレームワーク用の項目をここに追記する
