@@ -105,18 +105,66 @@ if [ -z "$(git config user.name)" ] || [ -z "$(git config user.email)" ]; then
   git config --global user.email \"GitHub の Settings → Emails にある ...@users.noreply.github.com のアドレス\""
 fi
 
+# 「やり直し」で作る控え(git stash)の目印。「控えを戻す」はこの目印の付いたものだけを扱う
+STASH_LABEL="やり直し"
+
 # ---- 状態 ----
 current_branch() { git branch --show-current; }
 on_main()    { [ "$(current_branch)" = "main" ]; }
 is_feature() { case "$(current_branch)" in feature/*) return 0 ;; *) return 1 ;; esac; }
+# 他の人のブランチを閲覧用(view/...)に開いている
+is_viewing() { case "$(current_branch)" in view/*) return 0 ;; *) return 1 ;; esac; }
+# ブランチの持ち主が自分か。main にない最初のコミットの作者(メールか名前)で判定する。
+# まだコミットがなければ、手元にそのブランチがある(= ここで作業開始した)なら自分のものとみなす。
+is_mine() {
+  local b=$1 ref who
+  ref="origin/$b"; git show-ref -q --verify "refs/remotes/$ref" || ref=$b
+  who=$(git log --reverse --no-merges --format='%ae|%an' "origin/main..$ref" 2>/dev/null | head -1)
+  if [ -z "$who" ]; then git show-ref -q --verify "refs/heads/$b"; return; fi
+  [ "${who%%|*}" = "$(git config user.email)" ] || [ "${who#*|}" = "$(git config user.name)" ]
+}
+# 自分の feature ブランチにいる(記録して送ってよい)
+on_own_feature() { is_feature && is_mine "$(current_branch)"; }
 has_upstream() { git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; }
 # 追跡先のブランチが GitHub から消えている(提出・マージ済みで自動削除された)
 upstream_deleted() {
-  local b; b=$(current_branch)
+  local b="${1:-$(current_branch)}"
   [ -n "$(git config "branch.${b}.merge")" ] && ! git show-ref -q --verify "refs/remotes/origin/${b}"
+}
+# GitHub から消えた feature ブランチ(今いるものも含む)を、手元の控え(merged/...)に退避する。
+# 残しておくと、同じ名前で「作業開始」できないうえ、そのブランチで作業を続けると
+# スカッシュマージ済みの変更を main から二重に取り込んで衝突するため。
+retire_merged_branches() {
+  local b
+  while IFS= read -r b; do
+    upstream_deleted "$b" || continue
+    git branch -m "$b" "merged/${b#feature/}-$(date '+%Y%m%d-%H%M%S')" || die "ブランチの退避に失敗しました。"
+    say "ブランチ $b は提出とマージが終わっているので、手元の控え(merged/...)に退避しました。"
+  done < <(git for-each-ref --format='%(refname:short)' 'refs/heads/feature/*')
 }
 # マージの途中なら取り消す(途中でなければ何もしない)
 abort_merge() { [ -f "$(git rev-parse --git-path MERGE_HEAD)" ] && git merge --abort; return 0; }
+
+# ---- 閲覧(他の人のブランチ) ----
+# 他の人のブランチから離れる前に呼ぶ。変更があれば確認してから捨てる。記録も送信もしない。
+leave_view() {
+  is_viewing || { is_feature && ! is_mine "$(current_branch)"; } || return 0
+  [ -z "$(git status --porcelain)" ] && return 0
+  say "他の人のブランチ($(current_branch))で、次のファイルが変更されています。"
+  git status --short
+  printf '\nこれらの変更を捨てて移動します。よろしいですか? (y/N): '
+  read -r ans
+  case "$ans" in y|Y) ;; *) stop "中止しました。何も変えていません。変更を残したいときは「やり直し(main に戻る)」を実行すると、控えに残してから main に戻れます。" ;; esac
+  abort_merge
+  { git reset -q --hard && git clean -q -fd; } || die "変更を捨てられませんでした。"
+}
+# 閲覧用ブランチ(view/...)のうち、今いないものを片付ける
+drop_view_branches() {
+  local b cur; cur=$(current_branch)
+  while IFS= read -r b; do
+    [ "$b" = "$cur" ] || git branch -q -D "$b"
+  done < <(git for-each-ref --format='%(refname:short)' 'refs/heads/view/')
+}
 
 # ---- 秘密情報らしきファイルの検出 ----
 check_secrets() {
@@ -153,7 +201,7 @@ save() {
   local changes; changes=$(git status --porcelain)
   if upstream_deleted; then
     [ -z "$changes" ] && return 0
-    stop "このブランチ($(current_branch))は提出とマージが終わり、GitHub から削除されています。「やり直し(main に戻る)」を実行すると、今の変更を控えに残して main に戻れます。その後「作業開始」で新しい Issue 番号を入れ、控えから必要な内容を写してください。分からなければチームのリーダーに相談してください。"
+    stop "このブランチ($(current_branch))は提出とマージが終わり、GitHub から削除されています。「やり直し(main に戻る)」を実行すると、今の変更を控えに残して main に戻れます。その後「作業開始」で新しいブランチを作り、「控えを戻す」を実行してください。分からなければチームのリーダーに相談してください。"
   fi
   if [ -n "$changes" ]; then
     check_secrets
@@ -179,15 +227,19 @@ update_main() {
   git pull -q --ff-only origin main || stop "main を最新にできませんでした。「やり直し(main に戻る)」を実行してください(変更は控えに残ります)。分からなければチームのリーダーに相談してください。"
 }
 
+# main の変更を今のブランチに取り込む。衝突したら取り消して失敗を返す。
+merge_main() {
+  git merge -q --no-edit origin/main && return 0
+  abort_merge
+  return 1
+}
+
 # 今のブランチを最新にし、main の変更を取り込む。衝突したら取り消して止まる。
 refresh_branch() {
   if has_upstream; then
     git pull -q --ff-only || die "ブランチを最新にできませんでした。"
   fi
-  if ! git merge -q --no-edit origin/main; then
-    abort_merge
-    die "main の変更とあなたの変更が衝突しました。取り込みは取り消したので、手元は元のままです。"
-  fi
+  merge_main || die "main の変更とあなたの変更が衝突しました。取り込みは取り消したので、手元は元のままです。"
   push_current
 }
 

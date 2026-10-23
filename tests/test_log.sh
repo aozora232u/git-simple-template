@@ -83,6 +83,7 @@ test_log_unwritable_die_hides_path() {
 test_log_before_name_check() {
   setup_origin
   clone_as alice
+  git config --unset user.name; git config --unset user.email
   GIT_CONFIG_GLOBAL=/dev/null run start 12   # 名前とメールが未設定の状態
   assert_contains "$OUT" "名前とメールの設定が必要です" "msg"
   assert_contains "$(cat "$(latest_log start)")" "結果: stop" "logged"
@@ -92,9 +93,16 @@ test_log_keeps_interactive_input() {
   setup_origin
   clone_as alice; run start 12 login
   clone_as bob
-  printf '1\n' > "$T/in"; INPUT="$T/in" run switch
-  assert_eq "feature/12-login" "$(git branch --show-current)" "switched"
+  pick feature/12-login; INPUT="$T/in" run switch
+  assert_eq "view/feature/12-login" "$(git branch --show-current)" "switched"
   assert_contains "$(cat "$(latest_log switch)")" "結果: 成功" "logged"
+}
+
+test_log_restore_name() {
+  setup_origin
+  clone_as alice; run restore
+  local f; f=$(latest_log restore); assert_file "$f"
+  assert_contains "$(cat "$f")" "メニュー: restore" "menu"
 }
 
 test_messages_say_team_leader() {

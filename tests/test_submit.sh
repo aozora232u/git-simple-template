@@ -55,3 +55,38 @@ test_submit_on_merged_branch_stops() {
   assert_contains "$OUT" "GitHub から削除されています" "msg"
   assert_not_contains "$OUT" "反映されています" "no false success"
 }
+
+test_submit_merges_main_before_send() {
+  setup_origin
+  clone_as alice; run start 12 login
+  (cd "$T/seed" && echo x > new.txt && git add . && git commit -qm m && git push -q)
+  write_pr; run submit
+  assert_eq 0 "$RC" "rc"
+  git -C "$T/origin.git" show feature/12-login:new.txt >/dev/null 2>&1 || fail "main not merged before send"
+}
+
+test_submit_conflict_restores_pr_md() {
+  setup_origin
+  clone_as alice; run start 12 login
+  (cd "$T/seed" && echo main > same.txt && git add . && git commit -qm m && git push -q)
+  echo alice > same.txt
+  write_pr
+  local written; written=$(cat PR.md)
+  run submit
+  assert_eq 1 "$RC" "rc"
+  assert_contains "$OUT" "提出を中止しました" "msg"
+  assert_eq "$written" "$(cat PR.md)" "PR.md restored"
+  git rev-parse -q --verify MERGE_HEAD >/dev/null && fail "MERGE_HEAD remains"
+  assert_no_file local/pr-history/feature_12-login.submitted
+}
+
+test_submit_view_branch_stops() {
+  setup_origin
+  clone_as bob; run start 20 bob; echo b > b.txt; save_here
+  clone_as alice
+  pick feature/20-bob; INPUT="$T/in" run switch
+  write_pr
+  run submit
+  assert_eq 1 "$RC" "rc"
+  assert_contains "$OUT" "他の人のブランチは提出できません" "msg"
+}

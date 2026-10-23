@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "作業開始",
-      "detail": "Issue の番号を入れると、自分の作業ブランチを作る(既にあれば戻る)",
+      "detail": "Issue の番号を入れると、自分の作業ブランチを新しく作る",
       "type": "process",
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
       "args": ["scripts/start.sh", "${input:issue}", "${input:name}"],
@@ -13,7 +13,7 @@
     },
     {
       "label": "ブランチ切り替え",
-      "detail": "GitHub にある作業ブランチの一覧から選んで切り替える(レビュー用)",
+      "detail": "GitHub にある作業ブランチの一覧から選んで切り替える(自分の作業に戻る・他の人の作業を見る)",
       "type": "process",
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
       "args": ["scripts/switch.sh"],
@@ -33,10 +33,20 @@
     },
     {
       "label": "やり直し(main に戻る)",
-      "detail": "切り替えられなくなったときに使う。記録していない変更を local/backup に控えてから main の最新に戻る",
+      "detail": "切り替えられなくなったときに使う。記録していない変更を控えに残してから main の最新に戻る",
       "type": "process",
       "command": "C:\\Program Files\\Git\\bin\\bash.exe",
       "args": ["scripts/reset.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "focus": true, "panel": "shared", "clear": true, "showReuseMessage": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "控えを戻す",
+      "detail": "「やり直し」で控えに残した変更を、今の自分のブランチに戻す",
+      "type": "process",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["scripts/restore.sh"],
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "always", "focus": true, "panel": "shared", "clear": true, "showReuseMessage": false },
       "problemMatcher": []
