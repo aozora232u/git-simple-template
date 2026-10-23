@@ -26,6 +26,7 @@ test_conflict_aborts() {
   save_here
   assert_eq 1 "$RC" "rc"
   assert_contains "$OUT" "衝突しました" "msg"
+  assert_contains "$OUT" "同じブランチを" "msg: same branch"
   git rev-parse -q --verify MERGE_HEAD >/dev/null && fail "MERGE_HEAD remains"
 }
 
@@ -37,6 +38,7 @@ test_conflict_with_main_aborts() {
   save_here
   assert_eq 1 "$RC" "rc"
   assert_contains "$OUT" "衝突しました" "msg"
+  assert_contains "$OUT" "main の変更と" "msg: main"
   assert_eq "alice" "$(cat same.txt)" "own content kept"
   git rev-parse -q --verify MERGE_HEAD >/dev/null && fail "MERGE_HEAD remains"
 }

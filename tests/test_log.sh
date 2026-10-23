@@ -51,9 +51,9 @@ test_log_keeps_latest_50() {
 test_log_same_second_distinct() {
   setup_origin
   clone_as alice; mkdir -p local/logs
-  # これから数秒分の名前を先に作っておき、同じ秒の衝突を必ず起こす
-  local s
-  for s in 0 1 2 3 4 5; do : > "local/logs/$(date -d "+$s sec" '+%Y-%m-%d_%H%M%S')_start.log"; done
+  # 基準時刻を 1 回だけ決め、これから 30 秒分の名前を先に作って、同じ秒の衝突を必ず起こす
+  local s base; base=$(date +%s)
+  for s in $(seq 0 30); do : > "local/logs/$(date -d "@$((base + s))" '+%Y-%m-%d_%H%M%S')_start.log"; done
   run start abc
   local f; f=$(ls local/logs/*_start_2.log 2>/dev/null)
   assert_file "$f"
